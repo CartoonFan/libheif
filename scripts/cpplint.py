@@ -558,10 +558,7 @@ def ParseNolintSuppressions(filename, raw_line, linenum, error):
   """
   matched = Search(r'\bNOLINT(NEXTLINE)?\b(\([^)]+\))?', raw_line)
   if matched:
-    if matched.group(1):
-      suppressed_line = linenum + 1
-    else:
-      suppressed_line = linenum
+    suppressed_line = linenum + 1 if matched.group(1) else linenum
     category = matched.group(2)
     if category in (None, '(*)'):  # => "suppress all"
       _error_suppressions.setdefault(None, set()).add(suppressed_line)
@@ -763,10 +760,8 @@ class _IncludeState(object):
     #
     # If previous line was a blank line, assume that the headers are
     # intentionally sorted the way they are.
-    if (self._last_header > header_path and
-        Match(r'^\s*#\s*include\b', clean_lines.elided[linenum - 1])):
-      return False
-    return True
+    return self._last_header <= header_path or not Match(
+        r'^\s*#\s*include\b', clean_lines.elided[linenum - 1])
 
   def CheckNextIncludeOrder(self, header_type):
     """Returns a non-empty error message if the next header is out of order.
@@ -1090,10 +1085,10 @@ class FileInfo(object):
       # Not SVN <= 1.6? Try to find a git, hg, or svn top level directory by
       # searching up from the current path.
       root_dir = os.path.dirname(fullname)
-      while (root_dir != os.path.dirname(root_dir) and
-             not os.path.exists(os.path.join(root_dir, ".git")) and
-             not os.path.exists(os.path.join(root_dir, ".hg")) and
-             not os.path.exists(os.path.join(root_dir, ".svn"))):
+      while not (root_dir == os.path.dirname(root_dir)
+                 or os.path.exists(os.path.join(root_dir, ".git"))
+                 or os.path.exists(os.path.join(root_dir, ".hg"))
+                 or os.path.exists(os.path.join(root_dir, ".svn"))):
         root_dir = os.path.dirname(root_dir)
 
       if (os.path.exists(os.path.join(root_dir, ".git")) or
@@ -1158,10 +1153,7 @@ def _ShouldPrintError(category, confidence, linenum):
         is_filtered = False
     else:
       assert False  # should have been checked for in SetFilter.
-  if is_filtered:
-    return False
-
-  return True
+  return not is_filtered
 
 
 def Error(filename, linenum, category, confidence, message):
@@ -1389,10 +1381,9 @@ class CleansedLines(object):
     self.raw_lines = lines
     self.num_lines = len(lines)
     self.lines_without_raw_strings = CleanseRawStrings(lines)
-    for linenum in range(len(self.lines_without_raw_strings)):
-      self.lines.append(CleanseComments(
-          self.lines_without_raw_strings[linenum]))
-      elided = self._CollapseStrings(self.lines_without_raw_strings[linenum])
+    for lines_without_raw_string in self.lines_without_raw_strings:
+      self.lines.append(CleanseComments(lines_without_raw_string))
+      elided = self._CollapseStrings(lines_without_raw_string)
       self.elided.append(CleanseComments(elided))
 
   def NumLines(self):
@@ -1527,11 +1518,10 @@ def FindEndOfExpressionInLine(line, startpos, stack):
 
       # Pop the stack if there is a matching '<'.  Otherwise, ignore
       # this '>' since it must be an operator.
-      if stack:
-        if stack[-1] == '<':
-          stack.pop()
-          if not stack:
-            return (i + 1, None)
+      if stack and stack[-1] == '<':
+        stack.pop()
+        if not stack:
+          return (i + 1, None)
     elif char == ';':
       # Found something that look like end of statements.  If we are currently
       # expecting a '>', the matching '<' must have been an operator, since
@@ -1804,7 +1794,7 @@ def CheckForHeaderGuard(filename, clean_lines, error):
       endif = line
       endif_linenum = linenum
 
-  if not ifndef or not define or ifndef != define:
+  if not (ifndef and define and ifndef == define):
     error(filename, 0, 'build/header_guard', 5,
           'No #ifndef header guard found, suggested CPP variable is: %s' %
           cppvar)
@@ -2069,10 +2059,7 @@ def IsMacroDefinition(clean_lines, linenum):
   if Search(r'^#define', clean_lines[linenum]):
     return True
 
-  if linenum > 0 and Search(r'\\$', clean_lines[linenum - 1]):
-    return True
-
-  return False
+  return bool(linenum > 0 and Search(r'\\$', clean_lines[linenum - 1]))
 
 
 def IsForwardClassDeclaration(clean_lines, linenum):
@@ -2197,10 +2184,7 @@ class _ClassInfo(_BlockInfo):
     # This means we will not check single-line class definitions.
     indent = Match(r'^( *)\}', clean_lines.elided[linenum])
     if indent and len(indent.group(1)) != self.class_indent:
-      if self.is_struct:
-        parent = 'struct ' + self.name
-      else:
-        parent = 'class ' + self.name
+      parent = 'struct ' + self.name if self.is_struct else 'class ' + self.name
       error(filename, linenum, 'whitespace/indent', 3,
             'Closing brace should be aligned with beginning of %s' % parent)
 
@@ -2472,11 +2456,7 @@ class NestingState(object):
     # The stack is always pushed/popped and not modified in place, so
     # we can just do a shallow copy instead of copy.deepcopy.  Using
     # deepcopy would slow down cpplint by ~28%.
-    if self.stack:
-      self.previous_stack_top = self.stack[-1]
-    else:
-      self.previous_stack_top = None
-
+    self.previous_stack_top = self.stack[-1] if self.stack else None
     # Update pp_stack
     self.UpdatePreprocessor(line)
 
@@ -2602,7 +2582,7 @@ class NestingState(object):
           if _MATCH_ASM.match(line):
             self.stack[-1].inline_asm = _BLOCK_ASM
 
-      elif token == ';' or token == ')':
+      elif token in [';', ')']:
         # If we haven't seen an opening brace yet, but we already saw
         # a semicolon, this is probably a forward declaration.  Pop
         # the stack for these.
@@ -2945,8 +2925,6 @@ def CheckForFunctionLengths(filename, clean_lines, linenum,
   """
   lines = clean_lines.lines
   line = lines[linenum]
-  joined_line = ''
-
   starting_func = False
   regexp = r'(\w(\w|::|\*|\&|\s)*)\('  # decls * & space::name( ...
   match_result = Match(regexp, line)
@@ -2960,6 +2938,8 @@ def CheckForFunctionLengths(filename, clean_lines, linenum,
 
   if starting_func:
     body_found = False
+    joined_line = ''
+
     for start_linenum in xrange(linenum, clean_lines.NumLines()):
       start_line = lines[start_linenum]
       joined_line += ' ' + start_line.lstrip()
@@ -3314,12 +3294,12 @@ def CheckParenthesisSpacing(filename, clean_lines, linenum, error):
                  r'\(([ ]*)(.).*[^ ]+([ ]*)\)\s*{\s*$',
                  line)
   if match:
-    if len(match.group(2)) != len(match.group(4)):
-      if not (match.group(3) == ';' and
-              len(match.group(2)) == 1 + len(match.group(4)) or
-              not match.group(2) and Search(r'\bfor\s*\(.*; \)', line)):
-        error(filename, linenum, 'whitespace/parens', 5,
-              'Mismatching spaces inside () in %s' % match.group(1))
+    if (len(match.group(2)) != len(match.group(4))
+        and (match.group(3) != ';'
+             or len(match.group(2)) != 1 + len(match.group(4)))
+        and (match.group(2) or not Search(r'\bfor\s*\(.*; \)', line))):
+      error(filename, linenum, 'whitespace/parens', 5,
+            'Mismatching spaces inside () in %s' % match.group(1))
     if len(match.group(2)) not in [0, 1]:
       error(filename, linenum, 'whitespace/parens', 5,
             'Should have zero or one spaces inside ( and ) in %s' %
@@ -3375,11 +3355,7 @@ def _IsType(clean_lines, nesting_state, expr):
   """
   # Keep only the last token in the expression
   last_word = Match(r'^.*(\b\S+)$', expr)
-  if last_word:
-    token = last_word.group(1)
-  else:
-    token = expr
-
+  token = last_word.group(1) if last_word else expr
   # Match native types and stdint types
   if _TYPES.match(token):
     return True
@@ -3487,8 +3463,8 @@ def CheckBracesSpacing(filename, clean_lines, linenum, nesting_state, error):
     # We also suppress warnings for `uint64_t{expression}` etc., as the style
     # guide recommends brace initialization for integral types to avoid
     # overflow/truncation.
-    if (not Match(r'^[\s}]*[{.;,)<>\]:]', trailing_text)
-        and not _IsType(clean_lines, nesting_state, leading_text)):
+    if not (Match(r'^[\s}]*[{.;,)<>\]:]', trailing_text)
+            or _IsType(clean_lines, nesting_state, leading_text)):
       error(filename, linenum, 'whitespace/braces', 5,
             'Missing space before {')
 
@@ -3527,9 +3503,7 @@ def IsDecltype(clean_lines, linenum, column):
   (text, _, start_col) = ReverseCloseExpression(clean_lines, linenum, column)
   if start_col < 0:
     return False
-  if Search(r'\bdecltype\s*$', text[0:start_col]):
-    return True
-  return False
+  return bool(Search(r'\bdecltype\s*$', text[0:start_col]))
 
 
 def CheckSectionSpacing(filename, clean_lines, class_info, linenum, error):
@@ -3570,15 +3544,14 @@ def CheckSectionSpacing(filename, clean_lines, class_info, linenum, error):
     # Also ignores cases where the previous line ends with a backslash as can be
     # common when defining classes in C macros.
     prev_line = clean_lines.lines[linenum - 1]
-    if (not IsBlankLine(prev_line) and
-        not Search(r'\b(class|struct)\b', prev_line) and
-        not Search(r'\\$', prev_line)):
+    if not (IsBlankLine(prev_line) or Search(r'\b(class|struct)\b', prev_line)
+            or Search(r'\\$', prev_line)):
       # Try a bit harder to find the beginning of the class.  This is to
       # account for multi-line base-specifier lists, e.g.:
       #   class Derived
       #       : public Base {
       end_class_head = class_info.starting_linenum
-      for i in range(class_info.starting_linenum, linenum):
+      for i in range(end_class_head, linenum):
         if Search(r'\{\s*$', clean_lines.lines[i]):
           end_class_head = i
           break
@@ -3633,9 +3606,9 @@ def CheckBraces(filename, clean_lines, linenum, error):
     # following line if it is part of an array initialization and would not fit
     # within the 80 character limit of the preceding line.
     prevline = GetPreviousNonBlankLine(clean_lines, linenum)[0]
-    if (not Search(r'[,;:}{(]\s*$', prevline) and
-        not Match(r'\s*#', prevline) and
-        not (GetLineWidth(prevline) > _line_length - 2 and '[]' in prevline)):
+    if (not Search(r'[,;:}{(]\s*$', prevline) and not Match(r'\s*#', prevline)
+        and
+        (GetLineWidth(prevline) <= _line_length - 2 or '[]' not in prevline)):
       error(filename, linenum, 'whitespace/braces', 4,
             '{ should almost always be at the end of the previous line')
 
@@ -3691,10 +3664,10 @@ def CheckBraces(filename, clean_lines, linenum, error):
       (endline, endlinenum, endpos) = CloseExpression(clean_lines, linenum, pos)
     # Check for an opening brace, either directly after the if or on the next
     # line. If found, this isn't a single-statement conditional.
-    if (not Match(r'\s*{', endline[endpos:])
-        and not (Match(r'\s*$', endline[endpos:])
-                 and endlinenum < (len(clean_lines.elided) - 1)
-                 and Match(r'\s*{', clean_lines.elided[endlinenum + 1]))):
+    if not Match(r'\s*{', endline[endpos:]) and (
+        not Match(r'\s*$', endline[endpos:])
+        or endlinenum >= len(clean_lines.elided) - 1
+        or not Match(r'\s*{', clean_lines.elided[endlinenum + 1])):
       while (endlinenum < len(clean_lines.elided)
              and ';' not in clean_lines.elided[endlinenum][endpos:]):
         endlinenum += 1
@@ -3839,18 +3812,18 @@ def CheckTrailingSemicolon(filename, clean_lines, linenum, error):
   else:
     # Try matching cases 2-3.
     match = Match(r'^(.*(?:else|\)\s*const)\s*)\{', line)
-    if not match:
-      # Try matching cases 4-6.  These are always matched on separate lines.
-      #
-      # Note that we can't simply concatenate the previous line to the
-      # current line and do a single match, otherwise we may output
-      # duplicate warnings for the blank line case:
-      #   if (cond) {
-      #     // blank line
-      #   }
-      prevline = GetPreviousNonBlankLine(clean_lines, linenum)[0]
-      if prevline and Search(r'[;{}]\s*$', prevline):
-        match = Match(r'^(\s*)\{', line)
+  if not match:
+    # Try matching cases 4-6.  These are always matched on separate lines.
+    #
+    # Note that we can't simply concatenate the previous line to the
+    # current line and do a single match, otherwise we may output
+    # duplicate warnings for the blank line case:
+    #   if (cond) {
+    #     // blank line
+    #   }
+    prevline = GetPreviousNonBlankLine(clean_lines, linenum)[0]
+    if prevline and Search(r'[;{}]\s*$', prevline):
+      match = Match(r'^(\s*)\{', line)
 
   # Check matching closing brace
   if match:
@@ -4075,8 +4048,8 @@ def CheckCheck(filename, clean_lines, linenum, error):
       matched = Match(r'^([^-=!<>()&|]+)(.*)$', expression)
       if not matched:
         matched = Match(r'^(\s*\S)(.*)$', expression)
-        if not matched:
-          break
+      if not matched:
+        break
       lhs += matched.group(1)
       expression = matched.group(2)
 
@@ -4346,11 +4319,11 @@ def _ClassifyInclude(fileinfo, include, is_system):
     >>> _ClassifyInclude(FileInfo('foo/foo.cc'), 'foo/bar.h', False)
     _OTHER_HEADER
   """
-  # This is a list of all standard c++ header files, except
-  # those already checked for above.
-  is_cpp_h = include in _CPP_HEADERS
-
   if is_system:
+    # This is a list of all standard c++ header files, except
+    # those already checked for above.
+    is_cpp_h = include in _CPP_HEADERS
+
     if is_cpp_h:
       return _CPP_SYS_HEADER
     else:
@@ -4362,9 +4335,10 @@ def _ClassifyInclude(fileinfo, include, is_system):
   target_dir, target_base = (
       os.path.split(_DropCommonSuffixes(fileinfo.RepositoryName())))
   include_dir, include_base = os.path.split(_DropCommonSuffixes(include))
-  if target_base == include_base and (
-      include_dir == target_dir or
-      include_dir == os.path.normpath(target_dir + '/../public')):
+  if target_base == include_base and include_dir in [
+      target_dir,
+      os.path.normpath(target_dir + '/../public'),
+  ]:
     return _LIKELY_MY_HEADER
 
   # If the target and include share some initial basename
@@ -4949,9 +4923,9 @@ def CheckForNonConstReference(filename, clean_lines, linenum,
   # We will exclude the first two cases by checking that we are not inside a
   # function body, including one that was just introduced by a trailing '{'.
   # TODO(unknown): Doesn't account for 'catch(Exception& e)' [rare].
-  if (nesting_state.previous_stack_top and
-      not (isinstance(nesting_state.previous_stack_top, _ClassInfo) or
-           isinstance(nesting_state.previous_stack_top, _NamespaceInfo))):
+  if (nesting_state.previous_stack_top
+      and not isinstance(nesting_state.previous_stack_top, _ClassInfo)
+      and not isinstance(nesting_state.previous_stack_top, _NamespaceInfo)):
     # Not at toplevel, not within a class, and not within a namespace
     return
 
@@ -5000,8 +4974,8 @@ def CheckForNonConstReference(filename, clean_lines, linenum,
 
   decls = ReplaceAll(r'{[^}]*}', ' ', line)  # exclude function body
   for parameter in re.findall(_RE_PATTERN_REF_PARAM, decls):
-    if (not Match(_RE_PATTERN_CONST_REF_PARAM, parameter) and
-        not Match(_RE_PATTERN_REF_STREAM_PARAM, parameter)):
+    if not (Match(_RE_PATTERN_CONST_REF_PARAM, parameter)
+            or Match(_RE_PATTERN_REF_STREAM_PARAM, parameter)):
       error(filename, linenum, 'runtime/references', 2,
             'Is this a non-const reference? '
             'If so, make const or use a pointer: ' +
@@ -5076,10 +5050,14 @@ def CheckCasts(filename, clean_lines, linenum, error):
   #
   # (char *) "foo" should always be a const_cast (reinterpret_cast won't
   # compile).
-  if CheckCStyleCast(filename, clean_lines, linenum, 'const_cast',
-                     r'\((char\s?\*+\s?)\)\s*"', error):
-    pass
-  else:
+  if not CheckCStyleCast(
+      filename,
+      clean_lines,
+      linenum,
+      'const_cast',
+      r'\((char\s?\*+\s?)\)\s*"',
+      error,
+  ):
     # Check pointer casts for other than string constants
     CheckCStyleCast(filename, clean_lines, linenum, 'reinterpret_cast',
                     r'\((\w+\s?\*+\s?)\)', error)
@@ -5584,12 +5562,8 @@ def IsBlockInNameSpace(nesting_state, is_forward_declaration):
     Whether or not the new block is directly in a namespace.
   """
   if is_forward_declaration:
-    if len(nesting_state.stack) >= 1 and (
-        isinstance(nesting_state.stack[-1], _NamespaceInfo)):
-      return True
-    else:
-      return False
-
+    return len(nesting_state.stack) >= 1 and (
+        isinstance(nesting_state.stack[-1], _NamespaceInfo))
   return (len(nesting_state.stack) > 1 and
           nesting_state.stack[-1].check_namespace_indentation and
           isinstance(nesting_state.stack[-2], _NamespaceInfo))
