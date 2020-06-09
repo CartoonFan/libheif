@@ -27,9 +27,7 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 # pylint: skip-file
-
 """Does google-lint on c++ files.
 
 The goal of this script is to identify places in the code that *may*
@@ -42,7 +40,6 @@ In particular, we can get very confused by /* and // inside strings!
 We do a small hack, which is to ignore //'s with "'s after them on the
 same line, but it is far from perfect (in either direction).
 """
-
 import codecs
 import copy
 import getopt
