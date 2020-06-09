@@ -54,7 +54,6 @@ import string
 import sys
 import unicodedata
 
-
 _USAGE = """
 Syntax: cpplint.py [--verbose=#] [--output=vs7] [--filter=-x,+y,...]
                    [--counting=total|toplevel|detailed] [--root=subdir]
