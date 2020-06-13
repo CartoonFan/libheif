@@ -8,7 +8,7 @@ os:
   - osx
   - linux
 dist: bionic
-cache: ccache
+cache:
   directories:
     - '$HOME/.sonar/cache'
 sudo: required
