@@ -13,11 +13,14 @@ cache:
     - '$HOME/.sonar/cache'
 addons:
   apt:
-    update: true
+    packages:
+      - libde265-dev
+      - libx265-dev
+      - libaom-dev
   sonarcloud:
     organization: "cartoonfan"
     token: 
-      secure: "JhCTfgEppIaIYJVhc8SfNNT1ZgENa1V5eH079Azubgc6lHZlppqOvlEUlQKUpPT3I/rFO8dCib7o9RCnl6B37EwSvCRaQ1edYnSvfrprm1kOLOY5cYjQtvPN3XyZkhN+4Q3VSHU22sENua+6AN+FV6V1Xe7RBP5HwR3OSgp3w8uc+Wmt4U9lJ1AbJOzfT0R6ZlgWpZfQ7kkInfULGz/q2sv1mbHk5F8dZHgVxgF3AjVocfdXAfaX56ifHAm0tQDg8bmOuPUuMBsael9ocegDwtm9ap+U6SE61NqtwDC0XYrXrWWGNndiKYJlUfSoiyfgC3TelowT/VJ2wudvNUJS1WTVah/0BnoGR6NZMbdmKrV7QcbViAZXRfA6UQ4Zrt21nBGUNyCocJg5GDbL8C0aNLkaFejWFBEPdCmPSyGfhW5z/sD7TpFPzKhTM90ouKxyIagPgaVA87zrA4w9nl/Be+d5rI2Hu9WSFs2Bk3rx6rJM/twdLmlRJUuzhBtB39pmuDMFqdodzpD8XgNiQafnCvdFNRwRoUr5dDcRKxe2vwUKxmLJctUMa7f51cvmwqe13vx0RA9cSQMGPSTADwfAPY9LRQWVxsJ+2f1w/rYpemIgfoKgddhoQ17jCqyY18Jo4VJvYI/n6zATE1bMRPW/h2/Eqn+7+75ASWsKU2JXuyc="
+      secure: "Mcz25GLk02rQP9YSvbVPo7TzeuJUbEuphxeAaeb66qec9fyR4MU/J5diMgi0Pu2AX3K7ZEuKkXGGSZ9FqMl5B2V3koQ5SEtEXRPJxACeA60YUiZhtcNLffR0o79vvLoa1SHUJDfedyAZ+Vun9qGptHu/yjC0DbUBjL8IkAB1EEqRKDa3/sPiNBpspu7wdY0Aj7Y9Ag7mxyxS06WtNRVxog9vmPEFx6R73HDaqf1G4KpCLSF4ilR9utN0jxE4SAWwPLFcEhH9NjtWvyKNi3OUyGOG5Q3WVvshhgqK6Gm10zaPuK65xyEnNo3nnVJHJTSdpGmqg9Fej+z0FqAyCtMNTqmAObRhIMi5cnnx1m3b6VdNynDqPbhmgGEA2FMB8XpVTBJ7aU4YGmDmBE2nI8EyVK6bAoUEAug+Fvz0ntC5tOnx96qBugt7zRSbCTeL3R427zy6WoX4IlH8Jr79yXG8GugCoi2tPTLgRx3LZogYHpO4QqCBqvkgpWUxVsP3BxWTaFITVD/wQBuDZNhYrFsyTnuJIXk1r9iI4IekVaaj0qRN4jTmmPXNdTTPUygbgmty/8Zpqx/s/48yRfw60avwq5BSzlLcLlpGNrhr5loyQLvSemCacrHdWaBVksbyJ9OtYvVGXF+5fhyYVGJ/v1E6ktBouUDqKIDWhf7ezZlw4xE="
 
 before_install:
 - git fetch --unshallow
