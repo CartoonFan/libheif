@@ -1,22 +1,28 @@
 /*
- * libheif thumbnailer for Gnome desktop.
- * Copyright (c) 2018 struktur AG, Dirk Farin <farin@struktur.de>
- *
- * This file is part of convert, an example application using libheif.
- *
- * convert is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * convert is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with convert.  If not, see <http://www.gnu.org/licenses/>.
- */
+  libheif thumbnailer for Gnome desktop.
+
+  MIT License
+
+  Copyright (c) 2018 struktur AG, Dirk Farin <farin@struktur.de>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+*/
 #if defined(HAVE_CONFIG_H)
 #include "config.h"
 #endif
@@ -44,7 +50,8 @@
 
 
 static int usage(const char* command) {
-  fprintf(stderr, "usage: %s [-s size] <filename> <output>\n", command);
+  fprintf(stderr, "usage: %s [-s size] [-p] <filename> <output>\n", command);
+  fprintf(stderr, " -p   Render thumbnail from primary image, even if thumbnail is stored in image.\n");
   return 1;
 }
 
@@ -53,11 +60,15 @@ int main(int argc, char** argv)
 {
   int opt;
   int size = 512; // default thumbnail size
+  bool thumbnail_from_primary_image_only = false;
 
-  while ((opt = getopt(argc, argv, "s:h")) != -1) {
+  while ((opt = getopt(argc, argv, "s:hp")) != -1) {
     switch (opt) {
     case 's':
       size = atoi(optarg);
+      break;
+    case 'p':
+      thumbnail_from_primary_image_only = true;
       break;
     case 'h':
     default:
@@ -100,20 +111,22 @@ int main(int argc, char** argv)
 
   // --- if image has a thumbnail, use that instead
 
-  heif_item_id thumbnail_ID;
-  int nThumbnails = heif_image_handle_get_list_of_thumbnail_IDs(image_handle, &thumbnail_ID, 1);
-  if (nThumbnails > 0) {
-    struct heif_image_handle* thumbnail_handle;
-    err = heif_image_handle_get_thumbnail(image_handle, thumbnail_ID, &thumbnail_handle);
-    if (err.code) {
-      std::cerr << "Could not read HEIF image : " << err.message << "\n";
-      return 1;
+  if (!thumbnail_from_primary_image_only) {
+    heif_item_id thumbnail_ID;
+    int nThumbnails = heif_image_handle_get_list_of_thumbnail_IDs(image_handle, &thumbnail_ID, 1);
+    if (nThumbnails > 0) {
+      struct heif_image_handle* thumbnail_handle;
+      err = heif_image_handle_get_thumbnail(image_handle, thumbnail_ID, &thumbnail_handle);
+      if (err.code) {
+        std::cerr << "Could not read HEIF image : " << err.message << "\n";
+        return 1;
+      }
+
+      // replace image handle with thumbnail handle
+
+      heif_image_handle_release(image_handle);
+      image_handle = thumbnail_handle;
     }
-
-    // replace image handle with thumbnail handle
-
-    heif_image_handle_release(image_handle);
-    image_handle = thumbnail_handle;
   }
 
 
@@ -122,12 +135,18 @@ int main(int argc, char** argv)
 
   std::unique_ptr<Encoder> encoder(new PngEncoder());
 
+  struct heif_decoding_options* decode_options = heif_decoding_options_alloc();
+  encoder->UpdateDecodingOptions(image_handle, decode_options);
+  decode_options->convert_hdr_to_8bit = true;
+
+  int bit_depth = 8;
+
   struct heif_image* image = NULL;
   err = heif_decode_image(image_handle,
                           &image,
                           encoder->colorspace(false),
-                          encoder->chroma(false),
-                          NULL);
+                          encoder->chroma(false, bit_depth),
+                          decode_options);
   if (err.code) {
     std::cerr << "Could not decode HEIF image : " << err.message << "\n";
     return 1;
@@ -148,9 +167,11 @@ int main(int argc, char** argv)
       thumbnail_height = input_height * size/input_width;
       thumbnail_width  = size;
     }
-    else {
+    else if (input_height > 0) {
       thumbnail_width  = input_width * size/input_height;
       thumbnail_height = size;
+    } else {
+      thumbnail_width  = thumbnail_height = 0;
     }
 
 

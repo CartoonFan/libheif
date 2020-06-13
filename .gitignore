@@ -3,7 +3,7 @@
 *.o
 *.pc
 m4/lt*.m4
-src/*.a
+libheif/*.a
 
 .deps
 .libs
@@ -14,7 +14,15 @@ config.*
 configure
 depcomp
 examples/heif-convert
+examples/heif-enc
 examples/heif-info
+examples/heif-test
+examples/heif-test-go
+examples/heif-thumbnailer
+examples/src
+examples/test-c-api
+go/go
+go/src
 install-sh
 libtool
 libheif.js
@@ -26,8 +34,7 @@ Makefile.in
 m4/libtool.m4
 missing
 out.bin
-src/box-fuzzer
-src/encoder-fuzzer
-src/file-fuzzer
-src/heif-version.h
+libheif/*-fuzzer
+libheif/heif_version.h
 stamp-h1
+tests/test-race

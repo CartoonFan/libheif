@@ -25,12 +25,9 @@
 #include "config.h"
 #endif
 
-#if defined(HAVE_INTTYPES_H)
-#include <inttypes.h>
-#endif
-#if defined(HAVE_STDDEF_H)
-#include <stddef.h>
-#endif
+#include <cinttypes>
+#include <cstddef>
+
 #include <vector>
 #include <string>
 #include <memory>
@@ -149,6 +146,7 @@ namespace heif {
     uint16_t read16();
     uint32_t read32();
     std::string read_string();
+    bool read(uint8_t* data, int64_t n);
 
     bool prepare_read(int64_t nBytes);
 

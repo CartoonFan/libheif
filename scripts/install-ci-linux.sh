@@ -24,6 +24,7 @@ INSTALL_PACKAGES=
 REMOVE_PACKAGES=
 BUILD_ROOT=$TRAVIS_BUILD_DIR
 UPDATE_APT=
+ADD_LIBHEIF_PPA=
 
 if [ "$WITH_LIBDE265" = "1" ]; then
     echo "Adding PPA strukturag/libde265 ..."
@@ -50,10 +51,15 @@ if [ "$WITH_LIBDE265" = "2" ]; then
     popd
 fi
 
+if [ "$WITH_AOM" = "1" ]; then
+    ADD_LIBHEIF_PPA=1
+    INSTALL_PACKAGES="$INSTALL_PACKAGES \
+        libaom-dev \
+        "
+fi
+
 if [ "$WITH_X265" = "1" ]; then
-    echo "Adding PPA strukturag/libheif ..."
-    sudo add-apt-repository -y ppa:strukturag/libheif
-    UPDATE_APT=1
+    ADD_LIBHEIF_PPA=1
     INSTALL_PACKAGES="$INSTALL_PACKAGES \
         libx265-dev \
         "
@@ -74,6 +80,7 @@ fi
 
 if [ ! -z "$WITH_GRAPHICS" ]; then
     INSTALL_PACKAGES="$INSTALL_PACKAGES \
+        libgdk-pixbuf2.0-dev \
         libjpeg-dev \
         libpng-dev \
         "
@@ -97,14 +104,26 @@ elif [ ! -z "$MINGW64" ]; then
         "
 fi
 
+if [ ! -z "$GO" ]; then
+    INSTALL_PACKAGES="$INSTALL_PACKAGES \
+        golang \
+        "
+fi
+
+if [ ! -z "$ADD_LIBHEIF_PPA" ]; then
+    echo "Adding PPA strukturag/libheif ..."
+    sudo add-apt-repository -y ppa:strukturag/libheif
+    UPDATE_APT=1
+fi
+
 if [ ! -z "$UPDATE_APT" ]; then
     echo "Updating package lists ..."
-    sudo apt-get update -qq
+    sudo apt-get update
 fi
 
 if [ ! -z "$INSTALL_PACKAGES" ]; then
     echo "Installing packages $INSTALL_PACKAGES ..."
-    sudo apt-get install -qq $INSTALL_PACKAGES
+    sudo apt-get install $INSTALL_PACKAGES
 fi
 
 if [ ! -z "$REMOVE_PACKAGES" ]; then
@@ -116,4 +135,13 @@ if [ ! -z "$EMSCRIPTEN_VERSION" ]; then
     echo "Installing emscripten $EMSCRIPTEN_VERSION to $BUILD_ROOT/emscripten ..."
     mkdir -p $BUILD_ROOT/emscripten
     ./scripts/install-emscripten.sh $EMSCRIPTEN_VERSION $BUILD_ROOT/emscripten
+fi
+
+if [ ! -z "$FUZZER" ]; then
+    ./scripts/install-clang.sh "$BUILD_ROOT/clang"
+fi
+
+if [ "$TRAVIS_BRANCH" = "coverity" ]; then
+    echo "Installing coverity build tool ..."
+    echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-certificates.crt
 fi
