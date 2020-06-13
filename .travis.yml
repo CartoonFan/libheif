@@ -33,7 +33,6 @@ script:
   # Wraps the compilation with the Build Wrapper to generate configuration (used
   # later by the SonarQube Scanner) into the "bw-output" folder
   - if [ $TRAVIS_OS_NAME = osx ]; then build-wrapper-macosx-x86 --out-dir bw-output cmake --build build/; else build-wrapper-linux-x86-64 --out-dir bw-output cmake --build build/; fi
-  - if [ $TRAVIS_OS_NAME = osx ]; then build-wrapper-macosx-x86 --out-dir bw-output make heif-test; else build-wrapper-linux-x86-64 --out-dir bw-output make heif-test; fi
   # And finally run the SonarCloud analysis - read the "sonar-project.properties"
   # file to see the specific configuration
   - sonar-scanner
