@@ -8,6 +8,14 @@ os:
   - osx
   - linux
 dist: bionic
+
+jobs:
+  include:
+    - os: linux
+      dist: bionic
+    - os: osx
+      osx_image: xcode11.5
+
 cache:
   directories:
     - '$HOME/.sonar/cache'
