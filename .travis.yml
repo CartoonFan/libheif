@@ -7,12 +7,18 @@ compiler:
 os:
   - osx
   - linux
-dist: trusty
+dist: bionic
 cache: ccache
+  directories:
+    - '$HOME/.sonar/cache'
 sudo: required
 addons:
   apt:
     update: true
+  sonarcloud:
+    organization: "cartoonfan"
+    token: 
+      secure: "JhCTfgEppIaIYJVhc8SfNNT1ZgENa1V5eH079Azubgc6lHZlppqOvlEUlQKUpPT3I/rFO8dCib7o9RCnl6B37EwSvCRaQ1edYnSvfrprm1kOLOY5cYjQtvPN3XyZkhN+4Q3VSHU22sENua+6AN+FV6V1Xe7RBP5HwR3OSgp3w8uc+Wmt4U9lJ1AbJOzfT0R6ZlgWpZfQ7kkInfULGz/q2sv1mbHk5F8dZHgVxgF3AjVocfdXAfaX56ifHAm0tQDg8bmOuPUuMBsael9ocegDwtm9ap+U6SE61NqtwDC0XYrXrWWGNndiKYJlUfSoiyfgC3TelowT/VJ2wudvNUJS1WTVah/0BnoGR6NZMbdmKrV7QcbViAZXRfA6UQ4Zrt21nBGUNyCocJg5GDbL8C0aNLkaFejWFBEPdCmPSyGfhW5z/sD7TpFPzKhTM90ouKxyIagPgaVA87zrA4w9nl/Be+d5rI2Hu9WSFs2Bk3rx6rJM/twdLmlRJUuzhBtB39pmuDMFqdodzpD8XgNiQafnCvdFNRwRoUr5dDcRKxe2vwUKxmLJctUMa7f51cvmwqe13vx0RA9cSQMGPSTADwfAPY9LRQWVxsJ+2f1w/rYpemIgfoKgddhoQ17jCqyY18Jo4VJvYI/n6zATE1bMRPW/h2/Eqn+7+75ASWsKU2JXuyc="
 env:
   global:
     - secure: "Hp9bDdzdJ0OzMcUW2NjddPYeTBcuK/8oM9h8wH0HT2T8JtcJcLQQ80+MfzKstWeittvosT3sp9JAhSHWdwRUu2Km0dFH3tbsDxYM1MrkdjSOd8sVeKlrGiFno3o8ek8vSPOH1MRx9io7z0N5mka0kLp4pB6C4zfL6AcPw+yt7srdfu+gJkPyPU8EupmzmD6dQQFdiNHz4gUt9S/wO2SKZiZ1hFJwDClnnWPzOdAJ2moIaQl0aXK/6F/PBPdTcHlMEr400p22B8Febio4dtWbQakwHrEzEajI/QVzXJWYLqh/ZGmY8VhwyntlIOQiV9nz979X5gwNtqDk7FcCXtEKluLheI1LHMALOqN9Kf2hLDaP7u2LyUUfKqOn8/hKhZM4tBoK0+m0joG3ZthwJ2ZRtRv9BqWhSs/BiYM8+ZI9L6RU5eX+e7UeXUWTvfqVNFL/E9TlfGwbka216ndGoeCeP5i6K7gsr04ElSTSczpNihDcaaO0ZuhlPOctXTFi+9HMS133FlYQqpfyzK0zGVC0xjlbA7kUMHef0SCPDlpRZF4oPK/SunHcdTYtick8J9qz+cpjbTcYEyburDABoKoTYEZA41nb8gyvetJnMWL4AZBoIR+2x9u4Y0sD+mEaWn1KqVr7y0TQqN4sLhoOzwe9ncjSyl7vq6lsP/chCBpN838="
@@ -175,4 +181,14 @@ before_script:
   - ./scripts/prepare-ci.sh
 
 script:
-  - ./scripts/run-ci.sh
+  # Prepare the build system
+  - mkdir build
+  - cd build
+  - cmake ..
+  - cd ..
+  # Wraps the compilation with the Build Wrapper to generate configuration (used
+  # later by the SonarQube Scanner) into the "bw-output" folder
+  - if [ $TRAVIS_OS_NAME = osx ]; then build-wrapper-macosx-x86 --out-dir bw-output cmake --build build/; else build-wrapper-linux-x86-64 --out-dir bw-output cmake --build build/; fi
+  # And finally run the SonarCloud analysis - read the "sonar-project.properties"
+  # file to see the specific configuration
+  - sonar-scanner
